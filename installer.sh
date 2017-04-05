@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # Userify Shim Installer
-# Copyright (c) 2011-2016 Userify Corporation
+# Copyright (c) 2017 Userify Corporation
 
 # How the shim works:
 #
@@ -38,8 +38,32 @@ export RESET_TEXT="[0m"
 export SELFSIGNED="$1"
 
 clear
+
+# Install Python on distributions that might be missing it.
+set +e
+
+if [ ! $(which python) ]; then
+    if [ $(which apt) ]; then
+        echo "Installing Python with apt-get"
+        sudo apt-get update >/dev/null
+        sudo apt-get -qqy install python >/dev/null
+        sudo apt-get -qqy install python-minimal >/dev/null
+    elif [ $(which yum) ]; then
+        echo "Installing Python with yum."
+        sudo yum install -y python >/dev/null
+    elif [ $(which dnf) ]; then
+        echo "Installing Python with dnf"
+        sudo dnf install -y python
+    else
+        set -e
+        echo "Unable to install Python (2.6, 2.7). Please contact Userify support for assistance."
+        exit 1
+    fi
+fi
+
+
 cat << EOF
-   
+
              ${BLUE_TEXT}            _--_
              ${BLUE_TEXT}           (    \\
              ${BLUE_TEXT}        --/      )
@@ -58,6 +82,9 @@ ${PURPLE_TEXT}Tip: to understand how the shim works, read the source at
 ${CYAN_TEXT}https://github.com/userify/shim/
 ${RESET_TEXT}
 EOF
+
+# to get things reset in case you are cat'ing..
+export RESET_TEXT="[0m"
 
 # Check for root
 if [ "$(id -u)" != "0" ]; then
@@ -116,7 +143,7 @@ cat << EOF > /opt/userify/uninstall.sh
 #
 # --------------------------------------------
 
-# Copyright (c) 2016 Userify Corp.
+# Copyright (c) 2017 Userify Corp.
 
 echo
 echo
@@ -180,6 +207,9 @@ if [ -z "$self_signed" ]; then self_signed="0"; fi
 # in a different company, by replacing these with the credentials for the new
 # server group.
 
+company = "$company_name"
+project = "$project_name"
+
 api_id = "$api_id"
 api_key = "$api_key"
 
@@ -190,6 +220,9 @@ EOF
 
     cat <<EOF >> /opt/userify/userify_config.py
 # Userify Shim Configuration
+
+company="$company_name"
+project="$project_name"
 
 # This file sourced by both Python and Bash scripts, so please ensure changes
 # are loadable by each.
@@ -230,7 +263,7 @@ cat << "EOF" > /opt/userify/shim.sh
 #
 # --------------------------------------------
 
-# Copyright (c) 2016 Userify Corp.
+# Copyright (c) 2017 Userify Corp.
 
 static_host="static.userify.com"
 source /opt/userify/userify_config.py
@@ -245,7 +278,7 @@ chmod -R 600 /var/log/userify-shim.log
 
 # kick off shim.py
 [ -z "$PYTHON" ] && PYTHON="$(which python)"
-curl -1 -f${SELFSIGNED}Ss https://$static_host/shim.py | $PYTHON -u >>/var/log/userify-shim.log 2>&1
+curl -1 -f${SELFSIGNED}Ss https://$static_host/shim.py | $PYTHON -u 2>&1 >> /var/log/userify-shim.log
 
 if [ $? != 0 ]; then
     # extra backoff in event of failure,
